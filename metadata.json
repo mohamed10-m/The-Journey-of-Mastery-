@@ -1,0 +1,7 @@
+{
+  "name": "رحلة الاتقان",
+  "description": "تطبيق لحفظ ومراجعة القرآن الكريم",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

@@ -1,0 +1,112 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid;
+    }
+
+    function uidNotModified() {
+      return !('uid' in request.resource.data) || 
+             ('uid' in resource.data && request.resource.data.uid == resource.data.uid) ||
+             (!('uid' in resource.data) && request.resource.data.uid == request.auth.uid);
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    function isPositive(field) {
+      return request.resource.data[field] is number && request.resource.data[field] >= 0;
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidUserProfile(data) {
+      return hasRequiredFields(['uid', 'points', 'streakDays', 'highestStreak', 'lastActive']) &&
+             hasOnlyAllowedFields(['uid', 'displayName', 'photoURL', 'gender', 'points', 'weeklyPoints', 'monthlyPoints', 'level', 'streakDays', 'highestStreak', 'lastActive', 'unlockedThemes', 'unlockedTreeShapes', 'hasResetV2']) &&
+             data.uid is string &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 100)) &&
+             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 1000)) &&
+             (!('gender' in data) || (data.gender in ['male', 'female'])) &&
+             isPositive('points') &&
+             (!('weeklyPoints' in data) || isPositive('weeklyPoints')) &&
+             (!('monthlyPoints' in data) || isPositive('monthlyPoints')) &&
+             (!('level' in data) || (data.level is string && data.level.size() <= 100)) &&
+             isPositive('streakDays') &&
+             isPositive('highestStreak') &&
+             (!('unlockedThemes' in data) || data.unlockedThemes == null || (data.unlockedThemes is list && data.unlockedThemes.size() <= 100)) &&
+             (!('unlockedTreeShapes' in data) || data.unlockedTreeShapes == null || (data.unlockedTreeShapes is list && data.unlockedTreeShapes.size() <= 100)) &&
+             (!('hasResetV2' in data) || data.hasResetV2 is bool) &&
+             data.lastActive is string; // Using string for date-time for simplicity, ideally use timestamp
+    }
+
+    function isValidFriendChallenge(data) {
+      return hasRequiredFields(['senderId', 'receiverId', 'type', 'target', 'status', 'createdAt', 'expiresAt']) &&
+             hasOnlyAllowedFields(['senderId', 'senderName', 'receiverId', 'receiverName', 'type', 'target', 'progress', 'status', 'createdAt', 'expiresAt']) &&
+             data.senderId is string &&
+             (!('senderName' in data) || data.senderName is string) &&
+             data.receiverId is string &&
+             (!('receiverName' in data) || data.receiverName is string) &&
+             data.type in ['ayahs', 'test'] &&
+             isPositive('target') &&
+             (!('progress' in data) || isPositive('progress')) &&
+             data.status in ['pending', 'accepted', 'completed', 'declined'] &&
+             data.createdAt is string &&
+             data.expiresAt is string;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+    match /users/{userId} {
+      // Anyone authenticated can read user profiles for the leaderboard
+      allow read: if isAuthenticated();
+      
+      // Only the owner can create or update their profile
+      allow create: if isOwner(userId) && isValidUserProfile(request.resource.data) && uidUnchanged();
+      allow update: if isOwner(userId) && isValidUserProfile(request.resource.data) && uidNotModified();
+      
+      // Users cannot delete their profiles (for now)
+      allow delete: if false;
+    }
+
+    match /friendChallenges/{challengeId} {
+      // Users can read challenges they sent or received
+      allow read: if isAuthenticated() && (resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid);
+      
+      // Users can create challenges where they are the sender
+      allow create: if isAuthenticated() && 
+                    request.resource.data.senderId == request.auth.uid && 
+                    isValidFriendChallenge(request.resource.data);
+      
+      // Users can update challenges they are involved in
+      allow update: if isAuthenticated() && 
+                    (resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid) &&
+                    isValidFriendChallenge(request.resource.data) &&
+                    areImmutableFieldsUnchanged(['senderId', 'senderName', 'receiverId', 'receiverName', 'type', 'target', 'createdAt', 'expiresAt']);
+      
+      allow delete: if false;
+    }
+  }
+}

@@ -1,0 +1,112 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user statistics and preferences for the leaderboard and challenges.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User's display name"
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "User's profile picture URL"
+        },
+        "gender": {
+          "type": "string",
+          "enum": ["male", "female"],
+          "description": "User's gender"
+        },
+        "points": {
+          "type": "number",
+          "description": "Total points earned"
+        },
+        "weeklyPoints": {
+          "type": "number",
+          "description": "Points earned this week"
+        },
+        "monthlyPoints": {
+          "type": "number",
+          "description": "Points earned this month"
+        },
+        "level": {
+          "type": "string",
+          "description": "Current level name"
+        },
+        "streakDays": {
+          "type": "number",
+          "description": "Current streak in days"
+        },
+        "highestStreak": {
+          "type": "number",
+          "description": "Highest streak achieved"
+        },
+        "lastActive": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last time the user was active"
+        },
+        "hasResetV2": {
+          "type": "boolean",
+          "description": "Whether the user has undergone the V2 reset"
+        }
+      },
+      "required": ["uid", "points", "streakDays", "highestStreak", "lastActive"]
+    },
+    "FriendChallenge": {
+      "title": "Friend Challenge",
+      "description": "A challenge sent between two users.",
+      "type": "object",
+      "properties": {
+        "senderId": {
+          "type": "string",
+          "description": "UID of the user who sent the challenge"
+        },
+        "receiverId": {
+          "type": "string",
+          "description": "UID of the user who received the challenge"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["ayahs", "test"],
+          "description": "Type of challenge"
+        },
+        "target": {
+          "type": "number",
+          "description": "Target value to achieve"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "accepted", "completed", "declined"],
+          "description": "Current status of the challenge"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the challenge was created"
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the challenge expires"
+        }
+      },
+      "required": ["senderId", "receiverId", "type", "target", "status", "createdAt", "expiresAt"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User profiles for leaderboard and stats."
+    },
+    "friendChallenges/{challengeId}": {
+      "schema": { "$ref": "#/entities/FriendChallenge" },
+      "description": "Challenges between friends."
+    }
+  }
+}
